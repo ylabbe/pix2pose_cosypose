@@ -19,7 +19,7 @@ sys.path.append("./bop_toolkit")
 if(len(sys.argv)!=4):
     print("python3 tools/5_evaluation_bop_basic.py [gpu_id] [cfg file] [dataset_name]")
     sys.exit()
-    
+
 gpu_id = sys.argv[1]
 if(gpu_id=='-1'):
     gpu_id=''
@@ -186,7 +186,7 @@ if(type(th_outlier[0])==list):
 th_inlier=cfg['inlier_th']
 th_ransac=3
 
-dummy_run=True
+dummy_run=False
 MODEL_DIR = os.path.join(bop_dir, "weight_detection")
 if(detect_type=='rcnn'):
     #Load mask r_cnn
@@ -211,42 +211,40 @@ elif(detect_type=='retinanet'):
 '''
 Load pix2pose inference weights
 '''
-load_partial=False
-obj_pix2pose=[]
-obj_names=[]
-image_dummy=np.zeros((im_height,im_width,3),np.uint8)
-if( 'backbone' in cfg.keys()):
-    backbone = cfg['backbone']
-else:
-    backbone = 'paper'
-for m_id,model_id in enumerate(model_ids):
-    model_param = model_params['{}'.format(model_id)]
-    obj_param=bop_io.get_model_params(model_param)
-    weight_dir = bop_dir+"/pix2pose_weights/{:02d}".format(model_id)
-    #weight_dir = "/home/kiru/media/hdd/weights/tless/tless_{:02d}".format(model_id)
-    if(backbone=='resnet50'):
-        #weight_fn = os.path.join(weight_dir,"inference_resnet_model.hdf5")
-        weight_fn = os.path.join(weight_dir,"inference_resnet50.hdf5")
-    else:
-        weight_fn = os.path.join(weight_dir,"inference.hdf5")
-    print("load pix2pose weight for obj_{} from".format(model_id),weight_fn)
-    if not(dynamic_th):
-        th_outlier = [th_outliers[m_id]] #provid a fixed outlier value
-        print("Set outlier threshold to ",th_outlier[0])    
-    recog_temp = recog.pix2pose(weight_fn,camK= cam_K,
-                                res_x=im_width,res_y=im_height,obj_param=obj_param,
-                                th_ransac=th_ransac,th_outlier=th_outlier,
-                                th_inlier=th_inlier,backbone=backbone)
-    obj_pix2pose.append(recog_temp)    
-    obj_names.append(model_id)
+# load_partial=False
+# obj_pix2pose=[]
+# obj_names=[]
+# image_dummy=np.zeros((im_height,im_width,3),np.uint8)
+# if( 'backbone' in cfg.keys()):
+#     backbone = cfg['backbone']
+# else:
+#     backbone = 'paper'
+# for m_id,model_id in enumerate(model_ids):
+#     model_param = model_params['{}'.format(model_id)]
+#     obj_param=bop_io.get_model_params(model_param)
+#     weight_dir = bop_dir+"/pix2pose_weights/{:02d}".format(model_id)
+#     #weight_dir = "/home/kiru/media/hdd/weights/tless/tless_{:02d}".format(model_id)
+#     if(backbone=='resnet50'):
+#         #weight_fn = os.path.join(weight_dir,"inference_resnet_model.hdf5")
+#         weight_fn = os.path.join(weight_dir,"inference_resnet50.hdf5")
+#     else:
+#         weight_fn = os.path.join(weight_dir,"inference.hdf5")
+#     print("load pix2pose weight for obj_{} from".format(model_id),weight_fn)
+#     if not(dynamic_th):
+#         th_outlier = [th_outliers[m_id]] #provid a fixed outlier value
+#         print("Set outlier threshold to ",th_outlier[0])    
+#     recog_temp = recog.pix2pose(weight_fn,camK= cam_K,
+#                                 res_x=im_width,res_y=im_height,obj_param=obj_param,
+#                                 th_ransac=th_ransac,th_outlier=th_outlier,
+#                                 th_inlier=th_inlier,backbone=backbone)
+#     obj_pix2pose.append(recog_temp)    
+#     obj_names.append(model_id)
 
 test_target_fn = cfg['test_target']
 target_list = bop_io.get_target_list(os.path.join(bop_dir,test_target_fn+".json"))
 
 prev_sid=-1
 result_dataset=[]
-
-model_ids_list = model_ids.tolist()
 
 if(dummy_run):
     #to activate networks before atual recognition
@@ -263,10 +261,10 @@ for scene_id,im_id,obj_id_targets,inst_counts in target_list:
     if(prev_sid!=scene_id):
         cam_path = test_dir+"/{:06d}/scene_camera.json".format(scene_id)
         cam_info = inout.load_scene_camera(cam_path)
-        if(dummy_run):
-            image_t = np.zeros((im_height,im_width,3),np.uint8)        
-            for obj_id_target in obj_id_targets: #refreshing
-                _,_,_,_,_,_ = obj_pix2pose[model_ids_list.index(obj_id_target)].est_pose(image_t,np.array([0,0,128,128],np.int))    
+        # if(dummy_run):
+        #     image_t = np.zeros((im_height,im_width,3),np.uint8)        
+        #     for obj_id_target in obj_id_targets: #refreshing
+        #         _,_,_,_,_,_ = obj_pix2pose[model_ids_list.index(obj_id_target)].est_pose(image_t,np.array([0,0,128,128],np.int))    
     
     prev_sid=scene_id #to avoid re-load scene_camera.json
     cam_param = cam_info[im_id]
@@ -288,90 +286,101 @@ for scene_id,im_id,obj_id_targets,inst_counts in target_list:
     t1=time.time()
     inst_count_est=np.zeros((len(inst_counts)))
     inst_count_pred = np.zeros((len(inst_counts)))
-    
+
     if(detect_type=='rcnn'):
         rois,obj_orders,obj_ids,scores,masks = get_rcnn_detection(image_t,model)
     elif(detect_type=='retinanet'):
         rois,obj_orders,obj_ids,scores = get_retinanet_detection(image_t,model)
-    
-    result_score=[]
-    result_objid=[]
-    result_R=[]
-    result_t=[]
-    result_roi=[]
-    result_img=[]
-    vis=False
 
-    for r_id,roi in enumerate(rois):
-        if(roi[0]==-1 and roi[1]==-1):
-            continue
-        obj_id = obj_ids[r_id]        
-        if not(obj_id in obj_id_targets):
-            # skip if the detected object is not in the target object
-            continue           
-        obj_gt_no = obj_id_targets.index(obj_id)
-        if(inst_count_pred[obj_gt_no]>inst_counts[obj_gt_no]*cand_factor):
-          continue
-        inst_count_pred[obj_gt_no]+=1
+    result = {'scene_id':scene_id,
+              'im_id': im_id,
+              'rois':rois.tolist(),
+              'scores':scores.tolist(),
+              'obj_ids': obj_ids.tolist(),
+              'obj_orders':obj_orders.tolist()}
+    p = '/gpfsscratch/rech/vuw/uwi72sr/datasets/pose-benchmarks/tless/retinanet_detections/{}-{}.json'.format(scene_id, im_id)
+    p = Path(p)
+    p.write_text(json.dumps(result))
 
-        obj_order_id = obj_orders[r_id]
-        obj_pix2pose[obj_order_id].camK=cam_K.reshape(3,3)                
-        img_pred,mask_pred,rot_pred,tra_pred,frac_inlier,bbox_t =\
-        obj_pix2pose[obj_order_id].est_pose(image_t,roi.astype(np.int))            
-        if(frac_inlier==-1):
-            continue        
-        if(score_type==2 and detect_type=='rcnn'):       
-            mask_from_detect = masks[:,:,r_id]         
-            union = np.sum(np.logical_or(mask_from_detect,mask_pred))
-            if(union<=0):
-                mask_iou=0
-            else:
-                mask_iou = np.sum(np.logical_and(mask_from_detect,mask_pred))/union
-            score=scores[r_id]*frac_inlier*mask_iou*union
-        else:
-            score = scores[r_id]        
-        #inst_count_pred[obj_gt_no]+=1
-        result_score.append(score)
-        result_objid.append(obj_id)
-        result_R.append(rot_pred)
-        result_t.append(tra_pred)
-        result_roi.append(roi)
+#     result_temp = {'scene_id':scene_id,'im_id': im_id,'obj_id':obj_id.item(),'score':score.item(),'R':R.tolist(),'t':t.tolist(),'time':time_spend, 'roi': roi.tolist()}
+
+#     result_score=[]
+#     result_objid=[]
+#     result_R=[]
+#     result_t=[]
+#     result_roi=[]
+#     result_img=[]
+#     vis=False
+
+#     for r_id,roi in enumerate(rois):
+#         if(roi[0]==-1 and roi[1]==-1):
+#             continue
+#         obj_id = obj_ids[r_id]        
+#         if not(obj_id in obj_id_targets):
+#             # skip if the detected object is not in the target object
+#             continue           
+#         obj_gt_no = obj_id_targets.index(obj_id)
+#         if(inst_count_pred[obj_gt_no]>inst_counts[obj_gt_no]*cand_factor):
+#           continue
+#         inst_count_pred[obj_gt_no]+=1
+
+#         obj_order_id = obj_orders[r_id]
+#         obj_pix2pose[obj_order_id].camK=cam_K.reshape(3,3)                
+#         img_pred,mask_pred,rot_pred,tra_pred,frac_inlier,bbox_t =\
+#         obj_pix2pose[obj_order_id].est_pose(image_t,roi.astype(np.int))            
+#         if(frac_inlier==-1):
+#             continue        
+#         if(score_type==2 and detect_type=='rcnn'):       
+#             mask_from_detect = masks[:,:,r_id]         
+#             union = np.sum(np.logical_or(mask_from_detect,mask_pred))
+#             if(union<=0):
+#                 mask_iou=0
+#             else:
+#                 mask_iou = np.sum(np.logical_and(mask_from_detect,mask_pred))/union
+#             score=scores[r_id]*frac_inlier*mask_iou*union
+#         else:
+#             score = scores[r_id]        
+#         #inst_count_pred[obj_gt_no]+=1
+#         result_score.append(score)
+#         result_objid.append(obj_id)
+#         result_R.append(rot_pred)
+#         result_t.append(tra_pred)
+#         result_roi.append(roi)
         
-    if len(result_score)>0:
-        result_score = np.array(result_score)
-        result_score = result_score/np.max(result_score) #normalize
-        sorted_id = np.argsort(1-result_score) #sort results
-        time_spend =time.time()-t1 #ends time for the computation
-        total_inst=0
-        n_inst = np.sum(inst_counts)
-    else:
-        continue    
+#     if len(result_score)>0:
+#         result_score = np.array(result_score)
+#         result_score = result_score/np.max(result_score) #normalize
+#         sorted_id = np.argsort(1-result_score) #sort results
+#         time_spend =time.time()-t1 #ends time for the computation
+#         total_inst=0
+#         n_inst = np.sum(inst_counts)
+#     else:
+#         continue    
     
-    for result_id in sorted_id:
-        total_inst+=1
-        if(task_type=='2' and total_inst>n_inst): #for vivo task
-            break        
-        obj_id = result_objid[result_id]
-        R = result_R[result_id].flatten()
-        t = (result_t[result_id]).flatten()
-        score = result_score[result_id]
-        roi = result_roi[result_id].flatten()
-        obj_gt_no = obj_id_targets.index(obj_id)
-        inst_count_est[obj_gt_no]+=1
-        if(task_type=='2' and inst_count_est[obj_gt_no]>inst_counts[obj_gt_no]):
-            #skip if the result exceeds the amount of taget instances for vivo task
-            continue
-        # import pdb; pdb.set_trace()
-        result_temp = {'scene_id':scene_id,'im_id': im_id,'obj_id':obj_id.item(),'score':score.item(),'R':R.tolist(),'t':t.tolist(),'time':time_spend, 'roi': roi.tolist()}
-        result_dataset.append(result_temp)
-    output_path = Path(os.path.join(output_dir,"pix2pose-iccv19_"+dataset+"-test-primesense-withrois-multi_instance.json"))
-    output_path.write_text(json.dumps(result_dataset))
+#     for result_id in sorted_id:
+#         total_inst+=1
+#         if(task_type=='2' and total_inst>n_inst): #for vivo task
+#             break        
+#         obj_id = result_objid[result_id]
+#         R = result_R[result_id].flatten()
+#         t = (result_t[result_id]).flatten()
+#         score = result_score[result_id]
+#         roi = result_roi[result_id].flatten()
+#         obj_gt_no = obj_id_targets.index(obj_id)
+#         inst_count_est[obj_gt_no]+=1
+#         if(task_type=='2' and inst_count_est[obj_gt_no]>inst_counts[obj_gt_no]):
+#             #skip if the result exceeds the amount of taget instances for vivo task
+#             continue
+#         # import pdb; pdb.set_trace()
+#         result_temp = {'scene_id':scene_id,'im_id': im_id,'obj_id':obj_id.item(),'score':score.item(),'R':R.tolist(),'t':t.tolist(),'time':time_spend, 'roi': roi.tolist()}
+#         result_dataset.append(result_temp)
+#     output_path = Path(os.path.join(output_dir,"pix2pose-iccv19_"+dataset+"-test-primesense-withrois-multi_instance.json"))
+#     output_path.write_text(json.dumps(result_dataset))
 
-if(dataset=='tless'):
-    output_path = os.path.join(output_dir,"pix2pose-iccv19_"+dataset+"-test-primesense.csv")
-else:
-    output_path = os.path.join(output_dir,"pix2pose-iccv19_"+dataset+"-test.csv")
+# if(dataset=='tless'):
+#     output_path = os.path.join(output_dir,"pix2pose-iccv19_"+dataset+"-test-primesense.csv")
+# else:
+#     output_path = os.path.join(output_dir,"pix2pose-iccv19_"+dataset+"-test.csv")
 
-print("Saving the result to ",output_path)
-inout.save_bop_results(output_path,result_dataset)
-
+# print("Saving the result to ",output_path)
+# inout.save_bop_results(output_path,result_dataset)

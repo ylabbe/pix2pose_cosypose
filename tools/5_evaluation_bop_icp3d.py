@@ -1,4 +1,6 @@
 import os,sys
+import json
+from pathlib import Path
 from math import radians
 import csv
 import cv2
@@ -37,6 +39,8 @@ else:
     from rendering.model import Model3D
 
 import math
+import ipdb; ipdb.set_trace()
+
 def render_obj(obj_m,rot,tra,cam_K,ren):
         ren.clear()
         ren.set_cam(cam_K)
@@ -427,10 +431,11 @@ for scene_id,im_id,obj_id_targets,inst_counts in target_list:
         else:
             score = scores[r_id]    
 
-        result_score.append(score)        
+        result_score.append(score)
         result_objid.append(obj_id)
         result_R.append(rot_pred)
-        result_t.append(tra_pred)        
+        result_t.append(tra_pred)
+        result_roi.append(roi)
     
     if len(result_score)>0:
         result_score = np.array(result_score)
@@ -449,14 +454,18 @@ for scene_id,im_id,obj_id_targets,inst_counts in target_list:
         obj_id = result_objid[result_id]
         R = result_R[result_id].flatten()
         t = (result_t[result_id]).flatten()
+        roi = result_roi[result_id].flatten()
         score = result_score[result_id]
         obj_gt_no = obj_id_targets.index(obj_id)
         inst_count_est[obj_gt_no]+=1
         if(task_type=='2' and inst_count_est[obj_gt_no]>inst_counts[obj_gt_no]):
             #skip if the result exceeds the amount of taget instances for vivo task
             continue
-        result_temp ={'scene_id':scene_id,'im_id': im_id,'obj_id':obj_id,'score':score,'R':R,'t':t,'time':time_spend }
+        result_temp ={'scene_id':scene_id,'im_id': im_id,'obj_id':obj_id,'score':score,'R':R,'t':t,'time':time_spend, 'roi': roi}
         result_dataset.append(result_temp)
+
+        output_path = Path(os.path.join(output_dir,"pix2pose-iccv19_"+dataset+"-test-primesense-withrois.json"))
+        output_path.write_text(json.dumps(result_dataset))
 
 
 if(dataset=='tless'):
@@ -466,6 +475,3 @@ else:
 
 print("Saving the result to ",output_path)
 inout.save_bop_results(output_path,result_dataset)
-
-
-
